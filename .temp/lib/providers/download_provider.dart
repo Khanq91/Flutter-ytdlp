@@ -1,0 +1,256 @@
+// lib/providers/download_provider.dart
+
+import 'dart:async';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
+
+import '../core/constants/app_constants.dart';
+import '../models/download_task.dart';
+import '../models/format_option.dart';
+import '../models/video_info.dart';
+import '../services/storage_service.dart';
+import '../services/ytdlp_service.dart';
+
+// ── State ──────────────────────────────────────────────────
+
+class DownloadState {
+  final List<DownloadTask> tasks;
+
+  const DownloadState({this.tasks = const []});
+
+  /// Đang chạy (downloading hoặc preparing)
+  List<DownloadTask> get activeTasks =>
+      tasks.where((t) => t.status.isActive).toList();
+
+  /// Đang xếp hàng chờ
+  List<DownloadTask> get queuedTasks =>
+      tasks.where((t) => t.status == DownloadStatus.queued).toList();
+
+  /// Đã xong (done, error, cancelled)
+  List<DownloadTask> get finishedTasks =>
+      tasks.where((t) => t.status.isFinished).toList();
+
+  int get successCount =>
+      tasks.where((t) => t.status == DownloadStatus.done).length;
+
+  int get errorCount =>
+      tasks.where((t) => t.status == DownloadStatus.error).length;
+
+  int get totalCount => tasks.length;
+
+  /// True khi không còn task nào active/queued
+  bool get allFinished =>
+      tasks.isNotEmpty &&
+      tasks.every((t) => t.status.isFinished);
+
+  DownloadState copyWith({List<DownloadTask>? tasks}) =>
+      DownloadState(tasks: tasks ?? this.tasks);
+}
+
+// ── Notifier ───────────────────────────────────────────────
+
+class DownloadNotifier extends Notifier<DownloadState> {
+  final _uuid = const Uuid();
+
+  /// Map taskId → StreamSubscription (để cancel)
+  final Map<String, StreamSubscription<DownloadTask>> _subs = {};
+
+  @override
+  DownloadState build() => const DownloadState();
+
+  // ── Public API ─────────────────────────────────────────
+
+  /// Thêm một video đơn vào hàng đợi
+  Future<void> enqueue({
+    required VideoInfo info,
+    required FormatOption format,
+  }) async {
+    final task = DownloadTask(
+      id: _uuid.v4(),
+      title: info.title,
+      url: info.url,
+      formatId: format.formatId,
+      ext: format.ext,
+      thumbnail: info.thumbnail,
+      status: DownloadStatus.queued,
+    );
+
+    _addTask(task);
+    _processQueue();
+  }
+
+  /// Thêm toàn bộ playlist vào hàng đợi
+  Future<void> enqueuePlaylist({
+    required VideoInfo playlistInfo,
+    required FormatOption format,
+  }) async {
+    // Lấy danh sách URL entries từ libytdlp.so
+    // (playlistInfo.url đã là playlist URL)
+    // Tạo 1 task tổng cho playlist — mỗi item sẽ thành 1 task riêng
+    // Ta dùng libytdlp.so tải playlist trực tiếp, nó tự xử lý từng video
+
+    final task = DownloadTask(
+      id: _uuid.v4(),
+      title: '${playlistInfo.title} (${playlistInfo.playlistCount ?? "?"} video)',
+      url: playlistInfo.url,
+      formatId: format.formatId,
+      ext: format.ext,
+      thumbnail: playlistInfo.thumbnail,
+      status: DownloadStatus.queued,
+    );
+
+    _addTask(task);
+    _processQueue();
+  }
+
+  /// Hủy một task đang chạy hoặc đang xếp hàng
+  void cancel(String taskId) {
+    final task = _findTask(taskId);
+    if (task == null || !task.canCancel) return;
+
+    // Kill process nếu đang chạy
+    task.process?.kill(ProcessSignal.sigterm);
+
+    // Hủy subscription
+    _subs[taskId]?.cancel();
+    _subs.remove(taskId);
+
+    _updateTask(taskId, (t) => t.copyWith(status: DownloadStatus.cancelled));
+
+    // Xử lý queue tiếp
+    _processQueue();
+  }
+
+  /// Retry task lỗi
+  Future<void> retry(String taskId) async {
+    final task = _findTask(taskId);
+    if (task == null || !task.canRetry) return;
+
+    _updateTask(
+      taskId,
+      (t) => t.copyWith(
+        status: DownloadStatus.queued,
+        progress: 0,
+        speed: '',
+        eta: '',
+        errorMessage: null,
+      ),
+    );
+
+    _processQueue();
+  }
+
+  /// Xóa task khỏi danh sách (chỉ khi đã finished)
+  void remove(String taskId) {
+    final current = state.tasks.toList();
+    current.removeWhere((t) => t.id == taskId && t.status.isFinished);
+    state = state.copyWith(tasks: current);
+  }
+
+  /// Xóa tất cả task đã xong
+  void clearFinished() {
+    final current = state.tasks
+        .where((t) => !t.status.isFinished)
+        .toList();
+    state = state.copyWith(tasks: current);
+  }
+
+  // ── Queue management ───────────────────────────────────
+
+  void _processQueue() {
+    final activeCount = state.activeTasks.length;
+    final available = AppConstants.maxConcurrentDownloads - activeCount;
+    if (available <= 0) return;
+
+    final queued = state.queuedTasks.take(available).toList();
+    for (final task in queued) {
+      _startDownload(task);
+    }
+  }
+
+  void _startDownload(DownloadTask task) {
+    final stream = YtdlpService.instance.download(
+      task,
+      outputDir: StorageService.instance.downloadPath,
+    );
+
+    final sub = stream.listen(
+      (updatedTask) {
+        _replaceTask(updatedTask);
+
+        // Khi task xong → xử lý queue tiếp
+        if (updatedTask.status.isFinished) {
+          _subs.remove(task.id);
+          _processQueue();
+        }
+      },
+      onError: (_) {
+        _updateTask(
+          task.id,
+          (t) => t.copyWith(
+            status: DownloadStatus.error,
+            errorMessage: 'Stream error',
+          ),
+        );
+        _subs.remove(task.id);
+        _processQueue();
+      },
+    );
+
+    _subs[task.id] = sub;
+  }
+
+  // ── Task CRUD helpers ──────────────────────────────────
+
+  void _addTask(DownloadTask task) {
+    state = state.copyWith(tasks: [...state.tasks, task]);
+  }
+
+  void _replaceTask(DownloadTask updated) {
+    final tasks = state.tasks.map((t) {
+      return t.id == updated.id ? updated : t;
+    }).toList();
+    state = state.copyWith(tasks: tasks);
+  }
+
+  void _updateTask(String id, DownloadTask Function(DownloadTask) updater) {
+    final tasks = state.tasks.map((t) {
+      return t.id == id ? updater(t) : t;
+    }).toList();
+    state = state.copyWith(tasks: tasks);
+  }
+
+  DownloadTask? _findTask(String id) {
+    try {
+      return state.tasks.firstWhere((t) => t.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final sub in _subs.values) {
+      sub.cancel();
+    }
+    _subs.clear();
+  }
+}
+
+// ── Providers ──────────────────────────────────────────────
+
+final downloadProvider =
+    NotifierProvider<DownloadNotifier, DownloadState>(DownloadNotifier.new);
+
+/// Shorthand: lấy 1 task theo id (dùng trong item widget)
+final downloadTaskProvider = Provider.family<DownloadTask?, String>((ref, id) {
+  return ref.watch(downloadProvider).tasks.cast<DownloadTask?>().firstWhere(
+    (t) => t?.id == id,
+    orElse: () => null,
+  );
+});
+
+/// Đếm task đang active (dùng cho badge trên Download tab)
+final activeDownloadCountProvider = Provider<int>((ref) {
+  return ref.watch(downloadProvider).activeTasks.length;
+});
