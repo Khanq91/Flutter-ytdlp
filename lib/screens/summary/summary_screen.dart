@@ -320,22 +320,41 @@ class _FailedList extends StatelessWidget {
           ...tasks.take(5).map((t) {
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.error_outline_rounded,
-                      size: 14, color: Color(0xFFFF3B30)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      t.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 13,
+                  Row(
+                    children: [
+                      const Icon(Icons.error_outline_rounded,
+                          size: 14, color: Color(0xFFFF3B30)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          t.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  // ✅ Thêm: hiện errorMessage
+                  if (t.errorMessage != null)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 22, top: 2),
+                      child: Text(
+                        t.errorMessage!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFFFF3B30),
+                          fontSize: 11,
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
             );

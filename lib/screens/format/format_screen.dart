@@ -20,12 +20,19 @@ import '../../widgets/primary_button.dart';
 // App sẽ tải video chất lượng tốt nhất rồi extract audio track ra M4A
 
 const _kExtractAudioFormatId = '__extract_audio__';
+const _kMuxedVideoFormatId = '__muxed_video__';
 
 final _kExtractAudioFormat = FormatOption(
   formatId:    _kExtractAudioFormatId,
   ext:         'm4a',
   quality:     'Tách từ video',
   isAudioOnly: true,
+);
+const _kMuxedVideoFormat = FormatOption(
+  formatId:    _kMuxedVideoFormatId,
+  ext:         'mp4',
+  quality:     'Video gốc',
+  isAudioOnly: false,
 );
 
 // ── Playlist presets ───────────────────────────────────────
@@ -340,11 +347,11 @@ class _FormatScreenState extends ConsumerState<FormatScreen>
                     // TikTok/Instagram: không có audio-only → hiện Extract option
                         ? [
                       _ExtractAudioTile(
-                        isSelected: _selectedFormat?.formatId ==
-                            _kExtractAudioFormatId,
-                        onTap: () => setState(
-                                () => _selectedFormat =
-                                _kExtractAudioFormat),
+                        selectedFormatId: _selectedFormat?.formatId,
+                        onSelectAudio: () => setState(
+                                () => _selectedFormat = _kExtractAudioFormat),
+                        onSelectVideo: () => setState(
+                                () => _selectedFormat = _kMuxedVideoFormat),
                       ),
                     ]
                         : _audioFormats.isEmpty
@@ -398,14 +405,109 @@ class _FormatScreenState extends ConsumerState<FormatScreen>
 
 // ── Extract Audio Tile ─────────────────────────────────────
 // Hiện khi source là muxed-only (TikTok, Instagram, v.v.)
+// ── Option tile dùng chung ─────────────────────────────────
 
-class _ExtractAudioTile extends StatelessWidget {
+class _MuxedOptionTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
   final bool isSelected;
   final VoidCallback onTap;
 
-  const _ExtractAudioTile({
+  const _MuxedOptionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
     required this.isSelected,
     required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.primary.withOpacity(0.12)
+              : AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? AppColors.primary.withOpacity(0.5)
+                : AppColors.border,
+            width: isSelected ? 1.2 : 0.8,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppColors.primary.withOpacity(0.2)
+                    : AppColors.surfaceElevated,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, size: 20,
+                  color: isSelected ? AppColors.primary : AppColors.textTertiary),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                    style: TextStyle(
+                      color: isSelected
+                          ? AppColors.textPrimary
+                          : AppColors.textSecondary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(subtitle,
+                      style: const TextStyle(
+                          color: AppColors.textTertiary, fontSize: 12)),
+                ],
+              ),
+            ),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected ? AppColors.primary : AppColors.textTertiary,
+                  width: isSelected ? 0 : 1.5,
+                ),
+                gradient: isSelected ? AppColors.primaryGradient : null,
+              ),
+              child: isSelected
+                  ? const Icon(Icons.check_rounded, color: Colors.white, size: 13)
+                  : null,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ExtractAudioTile extends StatelessWidget {
+  final String? selectedFormatId;
+  final VoidCallback onSelectAudio;
+  final VoidCallback onSelectVideo;
+
+  const _ExtractAudioTile({
+    required this.selectedFormatId,
+    required this.onSelectAudio,
+    required this.onSelectVideo,
   });
 
   @override
@@ -413,7 +515,7 @@ class _ExtractAudioTile extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Thông báo giải thích
+        // Banner thông báo
         Container(
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -430,7 +532,7 @@ class _ExtractAudioTile extends StatelessWidget {
               const SizedBox(width: 8),
               const Expanded(
                 child: Text(
-                  'Video này chỉ có định dạng muxed (video+audio). App sẽ tải video rồi tự động tách audio.',
+                  'Video này chỉ có định dạng muxed (video+audio). Chọn định dạng bạn muốn lưu.',
                   style: TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 12,
@@ -442,91 +544,25 @@ class _ExtractAudioTile extends StatelessWidget {
           ),
         ),
 
-        GestureDetector(
-          onTap: onTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? AppColors.primary.withOpacity(0.12)
-                  : AppColors.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isSelected
-                    ? AppColors.primary.withOpacity(0.5)
-                    : AppColors.border,
-                width: isSelected ? 1.2 : 0.8,
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? AppColors.primary.withOpacity(0.2)
-                        : AppColors.surfaceElevated,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    Icons.call_split_rounded,
-                    size: 20,
-                    color: isSelected
-                        ? AppColors.primary
-                        : AppColors.textTertiary,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Tách Audio (M4A)',
-                        style: TextStyle(
-                          color: isSelected
-                              ? AppColors.textPrimary
-                              : AppColors.textSecondary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      const Text(
-                        'Tải video → tách lấy âm thanh · không mất chất lượng',
-                        style: TextStyle(
-                          color: AppColors.textTertiary,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: 20,
-                  height: 20,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isSelected
-                          ? AppColors.primary
-                          : AppColors.textTertiary,
-                      width: isSelected ? 0 : 1.5,
-                    ),
-                    gradient: isSelected ? AppColors.primaryGradient : null,
-                  ),
-                  child: isSelected
-                      ? const Icon(Icons.check_rounded,
-                      color: Colors.white, size: 13)
-                      : null,
-                ),
-              ],
-            ),
-          ),
+        // Tile: Chỉ Audio M4A
+        _MuxedOptionTile(
+          icon: Icons.audio_file_rounded,
+          title: 'Chỉ Audio (M4A)',
+          subtitle: 'Tải video → tách lấy âm thanh · không mất chất lượng',
+          isSelected: selectedFormatId == _kExtractAudioFormatId,
+          onTap: onSelectAudio,
         ),
+
+        const SizedBox(height: 8),
+
+        // Tile: Giữ Video MP4
+        // _MuxedOptionTile(
+        //   icon: Icons.video_file_rounded,
+        //   title: 'Video (MP4)',
+        //   subtitle: 'Giữ nguyên file video có kèm âm thanh',
+        //   isSelected: selectedFormatId == _kMuxedVideoFormatId,
+        //   onTap: onSelectVideo,
+        // ),
       ],
     );
   }
@@ -680,10 +716,11 @@ class _BottomDownloadBar extends StatelessWidget {
       return '${playlistCount ?? "?"} video · ${selectedPreset!.label} · ${selectedPreset!.ext.toUpperCase()}';
     }
     if (!isPlaylist && selectedFormat != null) {
-      if (selectedFormat!.formatId == _kExtractAudioFormatId) {
-        return 'Tải video → tách audio M4A';
-      }
-      return '${selectedFormat!.displayLabel} · ${selectedFormat!.formattedFilesize}';
+      return switch (selectedFormat!.formatId) {
+        '__extract_audio__' => 'Tải video → tách audio M4A (file MP4 sẽ bị xóa)',
+        '__muxed_video__'   => 'Giữ nguyên video MP4',
+        _                   => '${selectedFormat!.displayLabel} · ${selectedFormat!.formattedFilesize}',
+      };
     }
     return '';
   }

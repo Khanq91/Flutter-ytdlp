@@ -169,7 +169,7 @@ def download(url: str, format_id: str, output_path: str = "") -> str:
 
     actual_format = format_id
 
-    if format_id in ("__extract_m4a__", "__extract_mp3__"):
+    if format_id in ("__extract_m4a__", "__extract_mp3__", "__extract_audio__"):
         actual_format = "bestvideo+bestaudio/best"
 
     # ✅ Đếm video bị skip trong download

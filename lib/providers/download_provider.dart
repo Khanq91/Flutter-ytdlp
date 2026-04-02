@@ -196,7 +196,7 @@ class DownloadNotifier extends Notifier<DownloadState> {
     );
 
     final sub = stream.listen(
-      (updatedTask) {
+      (updatedTask) async {
         _replaceTask(updatedTask);
 
         // Khi task xong → xử lý queue tiếp (TASK PROCESS RIEAL
@@ -204,24 +204,50 @@ class DownloadNotifier extends Notifier<DownloadState> {
         //   _subs.remove(task.id);
         //   _processQueue();
         // }
-        // TASK PROCESS FAKE
-        if (updatedTask.status.isFinished) {
-          // Future.delayed(const Duration(milliseconds: 100), () {
-          //   _fakeMap[task.id]?.complete((progress) {
-          //     _updateTask(task.id, (t) => t.copyWith(progress: progress));
-          //   });
-          _fakeMap[task.id]?.complete((progress) {
-            if (!_subs.containsKey(task.id)) return;
 
-            _updateTask(task.id, (t) => t.copyWith(progress: progress));
-          });
-
+        if (updatedTask.status == DownloadStatus.done) {
+          // ✅ Kiểm tra có cần extract audio không
+          if (_needsExtract(updatedTask) && updatedTask.outputPath != null) {
+            // Hiện fake progress trong lúc extract
+            _updateTask(task.id, (t) => t.copyWith(
+              status: DownloadStatus.preparing,
+              speed: 'Đang tách audio...',
+              progress: 0.95,
+            ));
+            await _extractAudio(updatedTask);
+          } else {
+            _fakeMap[task.id]?.complete((p) {
+              if (!_subs.containsKey(task.id)) return;
+              _updateTask(task.id, (t) => t.copyWith(progress: p));
+            });
             _fakeMap.remove(task.id);
-          // });
-
+          }
+          _subs.remove(task.id);
+          _processQueue();
+        } else if (updatedTask.status.isFinished) {
+          _fakeMap[task.id]?.dispose();
+          _fakeMap.remove(task.id);
           _subs.remove(task.id);
           _processQueue();
         }
+        // // TASK PROCESS FAKE
+        // if (updatedTask.status.isFinished) {
+        //   // Future.delayed(const Duration(milliseconds: 100), () {
+        //   //   _fakeMap[task.id]?.complete((progress) {
+        //   //     _updateTask(task.id, (t) => t.copyWith(progress: progress));
+        //   //   });
+        //   _fakeMap[task.id]?.complete((progress) {
+        //     if (!_subs.containsKey(task.id)) return;
+        //
+        //     _updateTask(task.id, (t) => t.copyWith(progress: progress));
+        //   });
+        //
+        //     _fakeMap.remove(task.id);
+        //   // });
+        //
+        //   _subs.remove(task.id);
+        //   _processQueue();
+        // }
       },
       onError: (_) {
         // START: FAKE PROCESS ---------------------------------------------
@@ -243,6 +269,57 @@ class DownloadNotifier extends Notifier<DownloadState> {
     );
 
     _subs[task.id] = sub;
+  }
+
+  bool _needsExtract(DownloadTask task) =>
+      task.formatId == '__extract_audio__' ||
+          task.formatId == '__extract_m4a__'   ||
+          task.formatId == '__extract_mp3__';
+
+  // Future<void> _extractAudio(DownloadTask task) async {
+  //   final result = await YtdlpService.instance.extractAudioNative(
+  //     inputPath: task.outputPath!,
+  //   );
+  //
+  //   _updateTask(task.id, (t) => t.copyWith(
+  //     status:      result.success ? DownloadStatus.done : DownloadStatus.error,
+  //     outputPath:  result.outputPath ?? t.outputPath,
+  //     errorMessage: result.error,
+  //     speed:       '',
+  //     progress:    result.success ? 1.0 : t.progress,
+  //     completedAt: result.success ? DateTime.now() : null,
+  //   ));
+  // }
+
+  Future<void> _extractAudio(DownloadTask task) async {
+    _updateTask(task.id, (t) => t.copyWith(
+      status:   DownloadStatus.preparing,
+      speed:    'Đang tách audio...',
+      progress: 0.95,
+    ));
+
+    final result = await YtdlpService.instance.extractAudioNative(
+      inputPath: task.outputPath!,
+    );
+
+    if (result.success) {
+      // ✅ Xóa file video gốc sau khi extract xong
+      try {
+        final original = File(task.outputPath!);
+        if (await original.exists()) await original.delete();
+      } catch (_) {
+        // Không crash nếu xóa thất bại
+      }
+    }
+
+    _updateTask(task.id, (t) => t.copyWith(
+      status:       result.success ? DownloadStatus.done : DownloadStatus.error,
+      outputPath:   result.outputPath ?? t.outputPath,
+      errorMessage: result.error,
+      speed:        '',
+      progress:     result.success ? 1.0 : t.progress,
+      completedAt:  result.success ? DateTime.now() : null,
+    ));
   }
 
   // Trong _startDownload(), sau khi stream báo done
