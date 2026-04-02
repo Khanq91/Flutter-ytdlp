@@ -31,6 +31,12 @@ dependencies:
   flutter:
     sdk: flutter
 
+#  ffmpeg_kit_flutter_new: ^2.0.0
+
+  # ── Audio extraction fallback (Phương án 1) ───────────
+  # Community fork của ffmpeg_kit_flutter, tương thích Flutter 3+ / Android V2 bindings
+  # Lưu ý: build lần đầu sẽ tự động download .aar (~35MB), cần build 2 lần
+  # Import: package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart
   shared_preferences: ^2.5.3
 
   # ── State Management ──────────────────────────────────

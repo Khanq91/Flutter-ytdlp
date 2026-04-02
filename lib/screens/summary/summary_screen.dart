@@ -61,7 +61,7 @@ class SummaryScreen extends ConsumerWidget {
 
                 // ── Actions ──────────────────────────────────
                 PrimaryButton(
-                  label: 'Mở thư mục Download',
+                  label: 'Mở thư mục Tải',
                   icon: Icons.folder_open_rounded,
                   onPressed: () async {
                     try {

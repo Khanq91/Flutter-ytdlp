@@ -41,6 +41,20 @@ class PlaylistEntriesFailure extends PlaylistEntriesResult {
   const PlaylistEntriesFailure(this.message);
 }
 
+// ── Kết quả extractAudio ────────────────────────────────────
+
+class ExtractAudioResult {
+  final bool success;
+  final String? outputPath;
+  final String? error;
+
+  const ExtractAudioResult({
+    required this.success,
+    this.outputPath,
+    this.error,
+  });
+}
+
 // ── Service ────────────────────────────────────────────────
 
 class YtdlpService {
@@ -48,6 +62,8 @@ class YtdlpService {
   static final YtdlpService instance = YtdlpService._();
 
   static const _channel = MethodChannel('ytdlp_channel');
+
+  // ── Analyze ───────────────────────────────────────────────
 
   Future<AnalyzeResult> analyze(String url) async {
     final trimmed = url.trim();
@@ -75,6 +91,8 @@ class YtdlpService {
       return AnalyzeFailure('Lỗi: $e');
     }
   }
+
+  // ── Playlist entries ──────────────────────────────────────
 
   Future<PlaylistEntriesResult> getPlaylistEntries(String url) async {
     try {
@@ -111,62 +129,165 @@ class YtdlpService {
     }
   }
 
+  // ── Download với real progress polling ───────────────────
+  // Bug fix: key name changed từ 'outputPath' → 'outputDir' để match Kotlin
+  // Bug fix 4: poll getProgress() thực sự thay vì chỉ dùng FakeProgress
+
   Stream<DownloadTask> download(
       DownloadTask task, {
         String? outputDir,
-      }) async* {
+      }) {
+    final controller = StreamController<DownloadTask>();
     final dir = outputDir ?? '/sdcard/Download/YTDLModule';
 
-    yield task.copyWith(status: DownloadStatus.preparing);
+    // Biến mutable để track state hiện tại của task
+    DownloadTask currentTask = task;
+    Timer? progressTimer;
+
+    void safeAdd(DownloadTask t) {
+      currentTask = t;
+      if (!controller.isClosed) controller.add(t);
+    }
+
+    // Bắt đầu: preparing
+    safeAdd(task.copyWith(status: DownloadStatus.preparing));
+
+    // Chuyển sang downloading
+    safeAdd(currentTask.copyWith(
+      status: DownloadStatus.downloading,
+      startedAt: DateTime.now(),
+      progress: 0.0,
+    ));
+
+    // Poll progress từ Python mỗi 600ms
+    // Python's get_progress() trả về dict được cập nhật bởi yt-dlp hook
+    // GIL được release khi yt-dlp thực hiện network I/O → safe to poll concurrently
+    progressTimer = Timer.periodic(const Duration(milliseconds: 600), (timer) async {
+      if (controller.isClosed) {
+        timer.cancel();
+        return;
+      }
+      try {
+        final jsonStr = await _channel.invokeMethod<String>('getProgress');
+        if (jsonStr == null || controller.isClosed) return;
+
+        final data   = json.decode(jsonStr) as Map<String, dynamic>;
+        final status = data['status'] as String? ?? '';
+
+        if (status != 'downloading') return;
+
+        final percent = (data['percent'] as num?)?.toDouble() ?? 0.0;
+        final speed   = (data['speed']   as String?) ?? '';
+        final eta     = (data['eta']     as String?) ?? '';
+
+        safeAdd(currentTask.copyWith(
+          status:   DownloadStatus.downloading,
+          progress: (percent / 100.0).clamp(0.0, 0.99),
+          speed:    speed,
+          eta:      eta,
+        ));
+      } catch (_) {
+        // Bỏ qua lỗi poll — không critical
+      }
+    });
+
+    // Gửi lệnh download (blocking đến khi hoàn thành)
+    _channel.invokeMethod<String>('download', {
+      'url':      task.url,
+      'formatId': task.formatId,
+      'outputDir': dir,  // Bug fix: 'outputPath' → 'outputDir'
+    }).then((jsonStr) {
+      progressTimer?.cancel();
+
+      if (controller.isClosed) return;
+
+      if (jsonStr == null) {
+        safeAdd(currentTask.copyWith(
+          status:       DownloadStatus.error,
+          errorMessage: 'Không nhận được phản hồi',
+        ));
+        controller.close();
+        return;
+      }
+
+      final data = json.decode(jsonStr) as Map<String, dynamic>;
+
+      if (data['success'] == false || data.containsKey('error')) {
+        safeAdd(currentTask.copyWith(
+          status:       DownloadStatus.error,
+          errorMessage: _parseError(data['error'] as String? ?? 'Download thất bại'),
+        ));
+      } else {
+        // Lấy path từ response (single video: 'path', playlist: 'path' = outputDir)
+        final outputPath = data['path'] as String?;
+        safeAdd(currentTask.copyWith(
+          status:      DownloadStatus.done,
+          progress:    1.0,
+          completedAt: DateTime.now(),
+          outputPath:  outputPath,
+          speed:       '',
+          eta:         '',
+        ));
+      }
+      controller.close();
+    }).catchError((Object e) {
+      progressTimer?.cancel();
+      if (controller.isClosed) return;
+
+      final msg = e is PlatformException
+          ? _parseError(e.message ?? 'Platform error')
+          : 'Lỗi: $e';
+
+      safeAdd(currentTask.copyWith(
+        status:       DownloadStatus.error,
+        errorMessage: msg,
+      ));
+      controller.close();
+    });
+
+    return controller.stream;
+  }
+
+  // ── Extract audio (Phương án 2: Android native MediaExtractor) ──────────────
+  // Copy audio track trực tiếp, không re-encode → nhanh, lossless
+  // Kết quả: file .m4a cùng thư mục với input
+
+  Future<ExtractAudioResult> extractAudioNative({
+    required String inputPath,
+  }) async {
+    final outputPath = inputPath.replaceAll(RegExp(r'\.[^.]+$'), '.m4a');
 
     try {
-      yield task.copyWith(
-        status: DownloadStatus.downloading,
-        startedAt: DateTime.now(),
-        progress: 0.0,
-      );
+      final success = await _channel.invokeMethod<bool>('extractAudio', {
+        'inputPath':  inputPath,
+        'outputPath': outputPath,
+      });
 
-      final jsonStr = await _channel.invokeMethod<String>(
-        'download',
-        {
-          'url': task.url,
-          'formatId': task.formatId,
-          'outputPath': dir,
-        },
-      );
-
-      final data = json.decode(jsonStr!) as Map<String, dynamic>;
-
-      if (data.containsKey('error')) {
-        yield task.copyWith(
-          status: DownloadStatus.error,
-          errorMessage: data['error'] as String,
-        );
+      if (success == true) {
+        return ExtractAudioResult(success: true, outputPath: outputPath);
       } else {
-        yield task.copyWith(
-          status: DownloadStatus.done,
-          progress: 1.0,
-          completedAt: DateTime.now(),
+        return const ExtractAudioResult(
+          success: false,
+          error:   'MediaExtractor: không tìm thấy audio track',
         );
       }
     } on PlatformException catch (e) {
-      yield task.copyWith(
-        status: DownloadStatus.error,
-        errorMessage: e.message ?? 'Lỗi download',
+      return ExtractAudioResult(
+        success: false,
+        error:   'MediaExtractor lỗi: ${e.message}',
       );
     } catch (e) {
-      yield task.copyWith(
-        status: DownloadStatus.error,
-        errorMessage: 'Lỗi: $e',
-      );
+      return ExtractAudioResult(success: false, error: '$e');
     }
   }
 
+  // ── Private ────────────────────────────────────────────────
+
   String _parseError(String err) {
-    if (err.contains('Private video')) return 'Video này là riêng tư';
+    if (err.contains('Private video'))  return 'Video này là riêng tư';
     if (err.contains('Unsupported URL')) return 'URL không được hỗ trợ';
-    if (err.contains('404')) return 'Video không tồn tại';
-    if (err.contains('Sign in')) return 'Video yêu cầu đăng nhập';
-    return err.length > 100 ? '${err.substring(0, 100)}...' : err;
+    if (err.contains('404'))            return 'Video không tồn tại';
+    if (err.contains('Sign in'))        return 'Video yêu cầu đăng nhập';
+    return err.length > 120 ? '${err.substring(0, 120)}...' : err;
   }
 }

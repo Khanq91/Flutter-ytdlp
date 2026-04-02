@@ -128,6 +128,7 @@ class _AnalyzeScreenState extends ConsumerState<AnalyzeScreen> {
                   controller: _controller,
                   focusNode: _focusNode,
                   platform: analyzeState.detectedPlatform,
+                  isUrlEmpty:  analyzeState.currentUrl.isEmpty,
                   onChanged: (url) =>
                       ref.read(analyzeProvider.notifier).onUrlChanged(url),
                   onPaste: _paste,
@@ -280,6 +281,7 @@ class _UrlInputCard extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
   final String platform;
+  final bool isUrlEmpty;
   final ValueChanged<String> onChanged;
   final VoidCallback onPaste;
   final VoidCallback onClear;
@@ -288,6 +290,7 @@ class _UrlInputCard extends StatelessWidget {
     required this.controller,
     required this.focusNode,
     required this.platform,
+    required this.isUrlEmpty,
     required this.onChanged,
     required this.onPaste,
     required this.onClear,
@@ -332,11 +335,11 @@ class _UrlInputCard extends StatelessWidget {
               ),
               // Paste / Clear button
               _ActionIconButton(
-                onTap: controller.text.isEmpty ? onPaste : onClear,
-                icon: controller.text.isEmpty
+                onTap: isUrlEmpty ? onPaste : onClear,
+                icon: isUrlEmpty
                     ? Icons.content_paste_rounded
                     : Icons.close_rounded,
-                tooltip: controller.text.isEmpty ? 'Dán' : 'Xóa',
+                tooltip: isUrlEmpty ? 'Dán' : 'Xóa',
               ),
             ],
           ),
