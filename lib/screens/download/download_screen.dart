@@ -173,9 +173,9 @@ class _StatChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.25), width: 0.8),
+        border: Border.all(color: color.withValues(alpha: 0.25), width: 0.8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -192,7 +192,7 @@ class _StatChip extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: color.withOpacity(0.8),
+              color: color.withValues(alpha: 0.8),
               fontSize: 12,
             ),
           ),
@@ -270,7 +270,7 @@ class _DownloadTaskCard extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: const Color(0xFFFF3B30).withOpacity(0.08),
+                color: const Color(0xFFFF3B30).withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
@@ -601,9 +601,9 @@ class _TinyButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
+          color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withOpacity(0.2), width: 0.6),
+          border: Border.all(color: color.withValues(alpha: 0.2), width: 0.6),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -639,7 +639,7 @@ class _EmptyState extends StatelessWidget {
           Icon(
             Icons.download_rounded,
             size: 56,
-            color: AppColors.textTertiary.withOpacity(0.4),
+            color: AppColors.textTertiary.withValues(alpha: 0.4),
           ),
           const SizedBox(height: 16),
           const Text(

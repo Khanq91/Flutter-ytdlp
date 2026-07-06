@@ -292,10 +292,10 @@ class _FormatScreenState extends ConsumerState<FormatScreen>
                   padding: const EdgeInsets.symmetric(
                       horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color:  const Color(0xFFFF9500).withOpacity(0.1),
+                    color:  const Color(0xFFFF9500).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                        color: const Color(0xFFFF9500).withOpacity(0.3)),
+                        color: const Color(0xFFFF9500).withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     children: [
@@ -431,12 +431,12 @@ class _MuxedOptionTile extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.primary.withOpacity(0.12)
+              ? AppColors.primary.withValues(alpha: 0.12)
               : AppColors.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected
-                ? AppColors.primary.withOpacity(0.5)
+                ? AppColors.primary.withValues(alpha: 0.5)
                 : AppColors.border,
             width: isSelected ? 1.2 : 0.8,
           ),
@@ -448,7 +448,7 @@ class _MuxedOptionTile extends StatelessWidget {
               height: 40,
               decoration: BoxDecoration(
                 color: isSelected
-                    ? AppColors.primary.withOpacity(0.2)
+                    ? AppColors.primary.withValues(alpha: 0.2)
                     : AppColors.surfaceElevated,
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -520,15 +520,15 @@ class _ExtractAudioTile extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.06),
+            color: AppColors.primary.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-                color: AppColors.primary.withOpacity(0.2), width: 0.8),
+                color: AppColors.primary.withValues(alpha: 0.2), width: 0.8),
           ),
           child: Row(
             children: [
               Icon(Icons.info_outline_rounded,
-                  size: 14, color: AppColors.primary.withOpacity(0.8)),
+                  size: 14, color: AppColors.primary.withValues(alpha: 0.8)),
               const SizedBox(width: 8),
               const Expanded(
                 child: Text(
@@ -617,12 +617,12 @@ class _PresetTile extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.primary.withOpacity(0.12)
+              ? AppColors.primary.withValues(alpha: 0.12)
               : AppColors.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected
-                ? AppColors.primary.withOpacity(0.5)
+                ? AppColors.primary.withValues(alpha: 0.5)
                 : AppColors.border,
             width: isSelected ? 1.2 : 0.8,
           ),
@@ -634,7 +634,7 @@ class _PresetTile extends StatelessWidget {
               height: 40,
               decoration: BoxDecoration(
                 color: isSelected
-                    ? AppColors.primary.withOpacity(0.2)
+                    ? AppColors.primary.withValues(alpha: 0.2)
                     : AppColors.surfaceElevated,
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -733,7 +733,7 @@ class _BottomDownloadBar extends StatelessWidget {
         MediaQuery.of(context).padding.bottom + 16,
       ),
       decoration: BoxDecoration(
-        color: AppColors.surface.withOpacity(0.95),
+        color: AppColors.surface.withValues(alpha: 0.95),
         border: const Border(
             top: BorderSide(color: AppColors.divider, width: 0.5)),
       ),
@@ -924,12 +924,12 @@ class _FormatTile extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.primary.withOpacity(0.12)
+              ? AppColors.primary.withValues(alpha: 0.12)
               : AppColors.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected
-                ? AppColors.primary.withOpacity(0.5)
+                ? AppColors.primary.withValues(alpha: 0.5)
                 : AppColors.border,
             width: isSelected ? 1.2 : 0.8,
           ),
@@ -986,7 +986,7 @@ class _FormatTile extends StatelessWidget {
               const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: isSelected
-                    ? AppColors.primary.withOpacity(0.2)
+                    ? AppColors.primary.withValues(alpha: 0.2)
                     : AppColors.surfaceElevated,
                 borderRadius: BorderRadius.circular(6),
               ),

@@ -2,7 +2,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../core/constants/app_constants.dart';
 import '../providers/network_provider.dart';
 import '../services/network_service.dart';
 
@@ -84,9 +83,9 @@ class _BadgePill extends StatelessWidget {
       curve: Curves.easeInOut,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.4), width: 0.8),
+        border: Border.all(color: color.withValues(alpha: 0.4), width: 0.8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -101,7 +100,7 @@ class _BadgePill extends StatelessWidget {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: color.withOpacity(0.5),
+                  color: color.withValues(alpha: 0.5),
                   blurRadius: 4,
                   spreadRadius: 1,
                 ),

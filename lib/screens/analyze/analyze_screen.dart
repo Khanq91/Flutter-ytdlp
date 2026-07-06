@@ -112,7 +112,7 @@ class _AnalyzeScreenState extends ConsumerState<AnalyzeScreen> {
                   serviceReady: _serviceReady,
                   onPickFolder: () async {
                     final path = await StorageService.instance.pickDownloadDirectory();
-                    if (path != null) {
+                    if (path != null && context.mounted) {
                       setState(() {});
 
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -558,10 +558,10 @@ class _ErrorCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFFF3B30).withOpacity(0.08),
+        color: const Color(0xFFFF3B30).withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFFFF3B30).withOpacity(0.25),
+          color: const Color(0xFFFF3B30).withValues(alpha: 0.25),
           width: 0.8,
         ),
       ),

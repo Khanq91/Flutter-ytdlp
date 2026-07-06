@@ -152,7 +152,7 @@ class DownloadTask {
   @override
   String toString() =>
       'DownloadTask(id=$id, title="$title", '
-      'status=${status.name}, progress=${progressPercent})';
+      'status=${status.name}, progress=$progressPercent)';
 }
 
 // ── Extension parse progress từ log libytdlp.so ────────────────

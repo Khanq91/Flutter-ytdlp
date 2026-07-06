@@ -41,10 +41,10 @@ class _PlaylistPickerScreenState extends ConsumerState<PlaylistPickerScreen> {
   List<PlaylistEntry> get _filteredEntries {
     if (_searchQuery.isEmpty) return _entries;
 
-    final query = VNnormalize(_searchQuery);
+    final query = vnNormalize(_searchQuery);
 
     return _entries.where((e) {
-      final title = VNnormalize(e.title);
+      final title = vnNormalize(e.title);
       return title.contains(query);
     }).toList();
   }
@@ -249,7 +249,7 @@ class _SelectionToolbar extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.12),
+                color: AppColors.primary.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
@@ -313,12 +313,12 @@ class _EntryTile extends StatelessWidget {
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: entry.selected
-              ? AppColors.primary.withOpacity(0.08)
+              ? AppColors.primary.withValues(alpha: 0.08)
               : AppColors.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: entry.selected
-                ? AppColors.primary.withOpacity(0.4)
+                ? AppColors.primary.withValues(alpha: 0.4)
                 : AppColors.border,
             width: entry.selected ? 1.2 : 0.8,
           ),
@@ -542,7 +542,7 @@ class _BottomBar extends StatelessWidget {
         MediaQuery.of(context).padding.bottom + 16,
       ),
       decoration: BoxDecoration(
-        color: AppColors.surface.withOpacity(0.95),
+        color: AppColors.surface.withValues(alpha: 0.95),
         border: const Border(
             top: BorderSide(color: AppColors.divider, width: 0.5)),
       ),

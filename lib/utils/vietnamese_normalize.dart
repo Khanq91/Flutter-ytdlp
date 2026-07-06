@@ -1,4 +1,4 @@
-String VNnormalize(String input) {
+String vnNormalize(String input) {
   const vietnamese = 'àáạảãâầấậẩẫăằắặẳẵ'
       'èéẹẻẽêềếệểễ'
       'ìíịỉĩ'

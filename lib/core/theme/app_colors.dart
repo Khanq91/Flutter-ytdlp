@@ -60,7 +60,7 @@ class AppColors {
     return LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
-      colors: [dominantColor.withOpacity(0.6), darker.withOpacity(0.9)],
+      colors: [dominantColor.withValues(alpha: 0.6), darker.withValues(alpha: 0.9)],
     );
   }
 }

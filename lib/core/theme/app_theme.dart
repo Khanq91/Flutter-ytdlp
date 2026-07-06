@@ -70,7 +70,7 @@ class AppTheme {
         ),
         iconTheme: const IconThemeData(color: AppColors.textPrimary),
       ),
-      tabBarTheme: TabBarTheme(
+      tabBarTheme: TabBarThemeData(
         labelColor: AppColors.primary,
         unselectedLabelColor: AppColors.textTertiary,
         indicator: const UnderlineTabIndicator(
@@ -89,7 +89,7 @@ class AppTheme {
         activeTrackColor: AppColors.primary,
         inactiveTrackColor: AppColors.divider,
         thumbColor: Colors.white,
-        overlayColor: AppColors.primary.withOpacity(0.15),
+        overlayColor: AppColors.primary.withValues(alpha: 0.15),
         trackHeight: 3,
         thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
       ),

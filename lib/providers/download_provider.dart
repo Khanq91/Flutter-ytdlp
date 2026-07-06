@@ -59,7 +59,16 @@ class DownloadNotifier extends Notifier<DownloadState> {
   final Map<String, FakeProgress> _fakeMap = {};
 
   @override
-  DownloadState build() => const DownloadState();
+  DownloadState build() {
+    ref.onDispose(() {
+      for (final sub in _subs.values) {
+        sub.cancel();
+      }
+      _subs.clear();
+    });
+
+    return const DownloadState();
+  }
 
   // ── Public API ─────────────────────────────────────────
 
@@ -416,13 +425,6 @@ class DownloadNotifier extends Notifier<DownloadState> {
     }
   }
 
-  @override
-  void dispose() {
-    for (final sub in _subs.values) {
-      sub.cancel();
-    }
-    _subs.clear();
-  }
 }
 
 // ── Providers ──────────────────────────────────────────────

@@ -57,7 +57,7 @@ class FormatOption {
             (acodec != null && acodec != 'none' && acodec.isNotEmpty);
 
     // ✅ Fix: filesize có thể là double — ép kiểu an toàn
-    int? _parseInt(dynamic val) {
+    int? safeParseInt(dynamic val) {
       if (val == null) return null;
       if (val is int) return val;
       if (val is double) return val.toInt();
@@ -65,8 +65,8 @@ class FormatOption {
       return null;
     }
 
-    final int? height = _parseInt(json['height']);
-    final int? abr = _parseInt(json['abr']);
+    final int? height = safeParseInt(json['height']);
+    final int? abr = safeParseInt(json['abr']);
 
     // TikTok: format muxed có cả vcodec + acodec → không phải audioOnly
     // nhưng không có height → dùng format_note
@@ -78,7 +78,7 @@ class FormatOption {
     } else {
       // TikTok muxed format: dùng format_note hoặc tbr
       final note = json['format_note'] as String?;
-      final tbr = _parseInt(json['tbr']);
+      final tbr = safeParseInt(json['tbr']);
       quality = note?.isNotEmpty == true
           ? note!
           : (tbr != null ? '${tbr}kbps' : json['format_id'] as String);
@@ -90,9 +90,9 @@ class FormatOption {
       quality:  quality,
       isAudioOnly: isAudioOnly,
       bitrate:  abr,
-      // ✅ Fix: dùng _parseInt thay vì cast thẳng
-      filesize: _parseInt(json['filesize']) ?? _parseInt(json['filesize_approx']),
-      width:    _parseInt(json['width']),
+      // ✅ Fix: dùng safeParseInt thay vì cast thẳng
+      filesize: safeParseInt(json['filesize']) ?? safeParseInt(json['filesize_approx']),
+      width:    safeParseInt(json['width']),
       height:   height,
       fps:      (json['fps'] as num?)?.toDouble(),
       vcodec:   vcodec,
