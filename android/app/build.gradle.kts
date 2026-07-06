@@ -9,6 +9,15 @@ android {
     namespace = "com.example.flutter_ytdlp"
     compileSdk = flutter.compileSdkVersion
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("release.jks")
+            storePassword = System.getenv("STORE_PASSWORD")
+            keyAlias = System.getenv("KEY_ALIAS")
+            keyPassword = System.getenv("KEY_PASSWORD")
+        }
+    }
+
     defaultConfig {
         applicationId = "com.example.flutter_ytdlp"
 //        minSdk = flutter.minSdkVersion
@@ -29,6 +38,12 @@ android {
 
     kotlinOptions {
         jvmTarget = "11"
+    }
+
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.getByName("release")
+        }
     }
 }
 
