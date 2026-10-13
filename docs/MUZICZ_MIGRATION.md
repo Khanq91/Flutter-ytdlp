@@ -1,5 +1,7 @@
 # Bản chuyển downloader từ Muzicz
 
+Đây là báo cáo bản chuyển ban đầu. Các thay đổi sau khi người dùng test URL, gồm mở thẳng màn nhập link và sửa metadata/TikTok, nằm trong [METADATA_FIXES.md](METADATA_FIXES.md). Số file tương đương và kết quả kiểm tra bên dưới là tại thời điểm chuyển ban đầu.
+
 Nguồn: `Muzicz`, commit `0f5fcadced1772e869b0cbacfa87e73cb99464e5`.
 Đợt chuyển này chỉ sửa Flutter-ytdlp. Muzicz giữ nguyên để đối chiếu và gỡ module ở đợt sau.
 

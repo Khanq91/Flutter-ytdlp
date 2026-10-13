@@ -9,7 +9,8 @@ import 'package:flutter_ytdlp/core/app_strings.dart';
 import 'package:flutter_ytdlp/main.dart';
 import 'package:flutter_ytdlp/features/downloader/providers/download_provider.dart';
 import 'package:flutter_ytdlp/features/downloader/screens/analyze/analyze_screen.dart';
-import 'package:flutter_ytdlp/features/downloader/screens/downloader_gateway_screen.dart';
+import 'package:flutter_ytdlp/features/downloader/core/app_router.dart';
+import 'package:flutter_ytdlp/features/downloader/screens/download/download_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -72,9 +73,47 @@ void main() {
     }
   });
 
-  testWidgets('standalone gateway opens downloader and back returns safely', (
-    tester,
-  ) async {
+  testWidgets(
+    'app starts with one named analyze root and returns from downloads',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            downloadOutputDirectoryProvider.overrideWith(_ReadyDirectory.new),
+          ],
+          child: const YtdlApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(AnalyzeScreen), findsOneWidget);
+      expect(find.byTooltip(AppStrings.back), findsNothing);
+      expect(
+        find.textContaining('/storage/emulated/0/Download'),
+        findsOneWidget,
+      );
+      final context = tester.element(find.byType(AnalyzeScreen));
+      final navigator = Navigator.of(context);
+      expect(navigator.canPop(), isFalse);
+      expect(ModalRoute.of(context)!.settings.name, AppRoutes.analyze);
+
+      // Match the stack predicate used after confirming a download format.
+      navigator.pushNamedAndRemoveUntil(
+        AppRoutes.download,
+        (route) => route.settings.name == AppRoutes.analyze,
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(DownloadScreen), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(AnalyzeScreen), findsOneWidget);
+      expect(navigator.canPop(), isFalse);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets('offline app still opens the URL input directly', (tester) async {
+    online = false;
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -84,35 +123,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.byType(DownloaderGatewayScreen), findsOneWidget);
-    expect(find.byTooltip(AppStrings.back), findsNothing);
-    expect(find.text('Quét lại thư viện'), findsNothing);
-
-    await tester.ensureVisible(find.text(AppStrings.downloadFromUrl));
-    await tester.tap(find.text(AppStrings.downloadFromUrl));
-    await tester.pumpAndSettle();
     expect(find.byType(AnalyzeScreen), findsOneWidget);
-    expect(find.textContaining('/storage/emulated/0/Download'), findsWidgets);
-
-    await tester.tap(find.byTooltip(AppStrings.back));
-    await tester.pumpAndSettle();
-    expect(find.byType(DownloaderGatewayScreen), findsOneWidget);
-    expect(find.byType(AnalyzeScreen), findsNothing);
-    expect(tester.takeException(), isNull);
-    await tester.pumpWidget(const SizedBox.shrink());
-  });
-
-  testWidgets('offline gateway retains network guard from Muzicz', (
-    tester,
-  ) async {
-    online = false;
-    await tester.pumpWidget(const ProviderScope(child: YtdlApp()));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text(AppStrings.downloadFromUrl));
-    await tester.tap(find.text(AppStrings.downloadFromUrl));
-    await tester.pumpAndSettle();
-    expect(find.byType(DownloaderGatewayScreen), findsOneWidget);
-    expect(find.byType(AnalyzeScreen), findsNothing);
+    expect(find.byType(TextField), findsOneWidget);
+    expect(find.byTooltip(AppStrings.back), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });

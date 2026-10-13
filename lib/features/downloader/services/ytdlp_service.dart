@@ -109,7 +109,7 @@ class YtdlpService
     try {
       final jsonStr = await _channel
           .invokeMethod<String>('analyze', {'url': trimmed})
-          .timeout(const Duration(seconds: 30));
+          .timeout(const Duration(seconds: 120));
 
       final data = json.decode(jsonStr!) as Map<String, dynamic>;
 
@@ -385,6 +385,7 @@ class YtdlpService
     if (err.contains('Unsupported URL')) return 'URL không được hỗ trợ';
     if (err.contains('404')) return 'Video không tồn tại';
     if (err.contains('Sign in')) return 'Video yêu cầu đăng nhập';
-    return err.length > 120 ? '${err.substring(0, 120)}...' : err;
+    // Preserve the full extractor reason; the useful part often follows a URL.
+    return err.replaceAll(RegExp(r'\x1B\[[0-9;]*m'), '').trim();
   }
 }

@@ -67,6 +67,19 @@ class MainActivity : FlutterFragmentActivity() {
                         }
                     }
 
+                    "getBackendInfo" -> {
+                        activityScope.launch {
+                            try {
+                                val info = ytdlpModule.callAttr("get_backend_info").toString()
+                                withContext(Dispatchers.Main) { result.success(info) }
+                            } catch (e: Exception) {
+                                withContext(Dispatchers.Main) {
+                                    result.error("BACKEND_ERROR", e.message, null)
+                                }
+                            }
+                        }
+                    }
+
                     // ── yt-dlp: analyze ───────────────────────────────────────
                     "analyze" -> {
                         val url = call.argument<String>("url") ?: ""

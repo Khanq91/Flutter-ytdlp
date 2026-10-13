@@ -15,6 +15,24 @@ void main() {
         .setMockMethodCallHandler(channel, null);
   });
 
+  test(
+    'analyze preserves the extractor reason beyond 120 characters',
+    () async {
+      final detail =
+          '${'context ' * 25}TikTok: Unexpected response from webpage request';
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            channel,
+            (_) async => json.encode({'error': detail}),
+          );
+      final result = await YtdlpService.instance.analyze(
+        'https://vt.tiktok.com/test/',
+      );
+      expect(result, isA<AnalyzeFailure>());
+      expect((result as AnalyzeFailure).message, detail);
+    },
+  );
+
   test('download sends task id and maps native cancellation', () async {
     MethodCall? enqueueCall;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -29,10 +47,9 @@ void main() {
           return null;
         });
 
-    final events =
-        await YtdlpService.instance
-            .download(_task, outputDir: '/downloads')
-            .toList();
+    final events = await YtdlpService.instance
+        .download(_task, outputDir: '/downloads')
+        .toList();
 
     expect(enqueueCall?.arguments, containsPair('taskId', _task.id));
     expect(events.last.status, DownloadStatus.cancelled);
@@ -68,8 +85,9 @@ void main() {
             return json.encode(
               _nativeTask(
                 taskId == _task.id ? _task : _secondTask,
-                status:
-                    completedTaskIds.contains(taskId) ? 'done' : 'downloading',
+                status: completedTaskIds.contains(taskId)
+                    ? 'done'
+                    : 'downloading',
                 progress: completedTaskIds.contains(taskId) ? 1 : 0,
               ),
             );
@@ -86,12 +104,12 @@ void main() {
           return null;
         });
 
-    final firstEventsFuture =
-        YtdlpService.instance.download(_task, outputDir: '/downloads').toList();
-    final secondEventsFuture =
-        YtdlpService.instance
-            .download(_secondTask, outputDir: '/downloads')
-            .toList();
+    final firstEventsFuture = YtdlpService.instance
+        .download(_task, outputDir: '/downloads')
+        .toList();
+    final secondEventsFuture = YtdlpService.instance
+        .download(_secondTask, outputDir: '/downloads')
+        .toList();
 
     await Future<void>.delayed(const Duration(milliseconds: 650));
     expect(progressTaskIds, containsAll({_task.id, _secondTask.id}));

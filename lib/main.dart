@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'features/downloader/core/app_router.dart';
-import 'features/downloader/screens/downloader_gateway_screen.dart';
 import 'theme/app_theme.dart';
 
 Future<void> main() async {
@@ -34,7 +33,11 @@ class YtdlApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
       onGenerateRoute: AppRouter.onGenerateRoute,
-      home: const DownloaderGatewayScreen(),
+      initialRoute: AppRoutes.analyze,
+      // Create one named root: format/download routes return to this screen.
+      onGenerateInitialRoutes: (_) => [
+        AppRouter.onGenerateRoute(const RouteSettings(name: AppRoutes.analyze)),
+      ],
     );
   }
 }

@@ -50,6 +50,9 @@ jobs:
       - name: Test downloader
         run: flutter test
 
+      - name: Test Python metadata bridge
+        run: python -m unittest discover -s test/python -v
+
       - name: Get app version
         id: version
         shell: bash

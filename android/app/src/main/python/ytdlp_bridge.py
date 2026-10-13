@@ -7,6 +7,18 @@ import os
 import threading
 from yt_dlp.utils import DownloadCancelled
 
+
+def get_backend_info() -> str:
+    """Report packaged native support without making any network requests."""
+    result = {"yt_dlp": yt_dlp.version.__version__}
+    try:
+        import curl_cffi
+        from yt_dlp.networking import _curlcffi  # Verify yt-dlp can use it too.
+        result["curl_cffi"] = curl_cffi.__version__
+    except Exception as error:
+        result["curl_cffi_error"] = str(error)
+    return json.dumps(result)
+
 # ─── Task-scoped download state ──────────────────────────────────────────────
 _progress_by_task = {}
 _cancel_events = {}
@@ -112,48 +124,46 @@ def _safe_json(obj):
 
 
 # ─── Analyze ─────────────────────────────────────────────────────────────────
-def analyze(url: str) -> str:
-    flat_opts = {
-        "quiet":        True,
-        "no_warnings":  True,
-        "ignoreerrors": True,
+def _metadata_options(*, lazy_playlist=False, noplaylist=False):
+    return {
+        "quiet": True,
+        "no_warnings": False,
+        # Propagate extractor failures instead of replacing them with None.
+        "ignoreerrors": False,
         "extract_flat": "in_playlist",
+        "lazy_playlist": lazy_playlist,
+        "noplaylist": noplaylist,
+        "socket_timeout": 20,
+        "retries": 1,
+        "extractor_retries": 1,
     }
+
+
+def analyze(url: str) -> str:
     try:
-        with yt_dlp.YoutubeDL(flat_opts) as ydl:
+        # A watch URL with a list parameter is still a single video. Explicit
+        # playlist URLs remain playlists. Do not fetch every playlist page just
+        # to show its title; the picker loads entries when it is opened.
+        opts = _metadata_options(lazy_playlist=True, noplaylist=True)
+        with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=False)
             if info is None:
-                return json.dumps({"error": "Không lấy được thông tin"})
+                raise ValueError("Extractor returned no metadata")
 
-            all_entries   = [e for e in (info.get("entries") or []) if e is not None]
-            valid_entries = [e for e in all_entries if e.get("id")]
-            skipped       = len(all_entries) - len(valid_entries)
-            is_playlist   = info.get("_type") == "playlist" or bool(all_entries)
-
-            if is_playlist:
+            if info.get("_type") in ("playlist", "multi_video"):
                 result = {
-                    "success":        True,
-                    "_type":          "playlist",
-                    "title":          info.get("title", "Playlist"),
-                    "thumbnail":      (info.get("thumbnails") or [{}])[-1].get("url"),
-                    "playlist_count": len(valid_entries),
-                    "skipped_count":  skipped,
-                    "formats":        [],
+                    "success": True,
+                    "_type": "playlist",
+                    "title": info.get("title", "Playlist"),
+                    "thumbnail": (info.get("thumbnails") or [{}])[-1].get("url"),
+                    "playlist_count": info.get("playlist_count") or info.get("n_entries"),
+                    "skipped_count": 0,
+                    "formats": [],
                 }
                 return json.dumps(_safe_json(result))
 
-        video_opts = {
-            "quiet":        True,
-            "no_warnings":  True,
-            "ignoreerrors": True,
-            "extract_flat": False,
-            "noplaylist":   True,
-        }
-        with yt_dlp.YoutubeDL(video_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            if info is None:
-                return json.dumps({"error": "Không lấy được thông tin"})
-
+            # extract_flat=in_playlist already fully extracts standalone videos.
+            # Reuse this result (and its cookies), rather than requesting twice.
             formats = []
             for f in (info.get("formats") or []):
                 formats.append({
@@ -173,6 +183,7 @@ def analyze(url: str) -> str:
                 })
 
             result = {
+                "id":            info.get("id", ""),
                 "title":         info.get("title", ""),
                 "duration":      info.get("duration", 0),
                 "thumbnail":     info.get("thumbnail", ""),
@@ -278,7 +289,7 @@ def download(task_id: str, url: str, format_id: str, output_path: str = "") -> s
         "progress_hooks":      [_make_progress_hook(task_id, cancel_event)],
         "postprocessor_hooks": [_make_postprocessor_hook(task_id, cancel_event)],
         "ignoreerrors":        True,
-        "noplaylist":          is_extract_audio,
+        "noplaylist":          True,  # A watch URL must not download its whole list.
         # verbose log
         "verbose":             True,
     }
@@ -388,12 +399,7 @@ def download(task_id: str, url: str, format_id: str, output_path: str = "") -> s
 
 
 def get_playlist_entries(url: str) -> str:
-    ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "ignoreerrors": True,
-        "extract_flat": "in_playlist",
-    }
+    ydl_opts = _metadata_options()
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)

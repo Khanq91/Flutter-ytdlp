@@ -1,4 +1,5 @@
 {
+  "snapshot": "Initial migration before metadata fixes; see METADATA_FIXES.md for subsequent changes.",
   "source_project": "Muzicz",
   "source_commit": "0f5fcadced1772e869b0cbacfa87e73cb99464e5",
   "files": [

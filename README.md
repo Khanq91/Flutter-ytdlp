@@ -2,18 +2,21 @@
 
 App Android tải video/audio từ URL, chuyển toàn bộ luồng downloader hiện có của Muzicz sang project độc lập để review. Muzicz chưa bị chỉnh sửa hoặc gỡ module.
 
+App mở thẳng màn “from Muzicz” nhập link. Các sửa lỗi phân tích URL sau bản chuyển đầu tiên được ghi trong [METADATA_FIXES.md](docs/METADATA_FIXES.md).
+
 Mã chính: `lib/features/downloader/`. Native backend: `android/app/src/main/kotlin/com/example/flutter_ytdlp/` và `android/app/src/main/python/ytdlp_bridge.py`.
 
 Xem [phạm vi chuyển, các điều chỉnh và checklist review](docs/MUZICZ_MIGRATION.md), cùng [bảng đối chiếu 54 file nguồn](docs/muzicz-source-map.json).
 
 ## Chạy và kiểm tra
 
-Yêu cầu Flutter 3.44.5 (Dart 3.12), Android SDK/NDK 27.0.12077973, Java tương thích Gradle và Python 3.13 có `venv`. App hỗ trợ Android API 24+, ABI arm64-v8a/x86_64.
+Yêu cầu Flutter 3.44.5 (Dart 3.12), Android SDK/NDK 28.2.13676358, Java tương thích Gradle và Python 3.13 có `venv`. App hỗ trợ Android API 24+, ABI arm64-v8a/x86_64.
 
 ```sh
 flutter pub get
 flutter analyze --no-fatal-infos
 flutter test
+python -m unittest discover -s test/python -v
 flutter run
 flutter build apk --debug
 ```
@@ -32,3 +35,9 @@ Trên Windows, nếu `flutter pub get` báo thiếu symlink support cho plugin d
 Build release giữ cấu hình signing sẵn có: `android/app/release.jks` và các biến `STORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`. Workflow `.github/workflows/build-apk.yml` dùng các secrets hiện có; chưa chạy/publish workflow trong đợt chuyển này.
 
 Các thư mục nền tảng khác vẫn là scaffold cũ, chưa có backend download tương đương Android. `.temp/` là bản lưu cũ, không tham gia app đang chạy.
+
+Kiểm tra metadata qua Python/Kotlin thực trên thiết bị Android (có truy cập mạng, không tải file video):
+
+```sh
+flutter test integration_test/metadata_smoke_test.dart -d DEVICE_ID --dart-define=LIVE_METADATA_TESTS=true
+```

@@ -131,31 +131,33 @@ class _AnalyzeScreenState extends ConsumerState<AnalyzeScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // ── Back button row ──────────────────────────
-                Row(
-                  children: [
-                    // 36dp visual inside the default 48dp tap target.
-                    IconButton(
-                      tooltip: AppStrings.back,
-                      onPressed:
-                          () =>
-                              Navigator.of(context, rootNavigator: true).pop(),
-                      style: IconButton.styleFrom(
-                        backgroundColor: c.surfaceElevated,
-                        fixedSize: const Size(36, 36),
-                        padding: EdgeInsets.zero,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                if (Navigator.of(context).canPop()) ...[
+                  Row(
+                    children: [
+                      // 36dp visual inside the default 48dp tap target.
+                      IconButton(
+                        tooltip: AppStrings.back,
+                        onPressed:
+                            () =>
+                                Navigator.of(context, rootNavigator: true).pop(),
+                        style: IconButton.styleFrom(
+                          backgroundColor: c.surfaceElevated,
+                          fixedSize: const Size(36, 36),
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        icon: Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          size: 16,
+                          color: c.textSecondary,
                         ),
                       ),
-                      icon: Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        size: 16,
-                        color: c.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
 
                 // ── Header ──────────────────────────────────
                 _Header(
