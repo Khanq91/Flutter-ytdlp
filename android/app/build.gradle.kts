@@ -8,6 +8,7 @@ plugins {
 android {
     namespace = "com.example.flutter_ytdlp"
     compileSdk = flutter.compileSdkVersion
+    ndkVersion = "27.0.12077973"
 
     signingConfigs {
         create("release") {
@@ -27,7 +28,8 @@ android {
         versionName = flutter.versionName
 
         ndk {
-            abiFilters += listOf("arm64-v8a", "x86_64")
+            abiFilters.clear()
+            abiFilters.addAll(listOf("arm64-v8a", "x86_64"))
         }
     }
 
@@ -50,6 +52,10 @@ android {
 chaquopy {
     defaultConfig {
         version = "3.13"
+        // Optional local interpreter; CI discovers setup-python on PATH.
+        System.getenv("YTDLP_BUILD_PYTHON")?.takeIf { it.isNotBlank() }?.let {
+            buildPython(it)
+        }
         pip {
             install("yt-dlp")
         }

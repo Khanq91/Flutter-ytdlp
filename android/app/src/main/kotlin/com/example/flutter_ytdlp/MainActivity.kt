@@ -2,26 +2,22 @@ package com.example.flutter_ytdlp
 
 import android.app.DownloadManager
 import android.content.Intent
-import android.media.MediaCodec
-import android.media.MediaExtractor
-import android.media.MediaFormat
-import android.media.MediaMuxer
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
-import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
-import com.chaquo.python.Python
-import com.chaquo.python.android.AndroidPlatform
 import kotlinx.coroutines.*
-import java.io.File
-import java.nio.ByteBuffer
 
-class MainActivity : FlutterActivity() {
+import io.flutter.embedding.android.FlutterFragmentActivity
 
-    private val CHANNEL = "ytdlp_channel"
-    private val activityScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+class MainActivity : FlutterFragmentActivity() {
+
+    // ── Channel dùng chung cho ytdlp feature ──────────────────────────────────
+    private val YTDLP_CHANNEL = "ytdlp_channel"
+    private val activityScope  = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val ytdlpModule get() = YtdlpPython.module(applicationContext)
 
     override fun onDestroy() {
         super.onDestroy()
@@ -31,18 +27,11 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        if (!Python.isStarted()) {
-            Python.start(AndroidPlatform(this))
-        }
-
-        val py     = Python.getInstance()
-        val module = py.getModule("ytdlp_bridge")
-
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, YTDLP_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
 
-                    // ── Storage utils ──────────────────────────────
+                    // ── Storage utils ─────────────────────────────────────────
                     "getDownloadDir" -> {
                         val dir = Environment.getExternalStoragePublicDirectory(
                             Environment.DIRECTORY_DOWNLOADS
@@ -62,7 +51,9 @@ class MainActivity : FlutterActivity() {
                             if (intent.resolveActivity(packageManager) != null) {
                                 startActivity(intent)
                             } else {
-                                val uri = Uri.parse("content://com.android.externalstorage.documents/root/primary")
+                                val uri = Uri.parse(
+                                    "content://com.android.externalstorage.documents/root/primary"
+                                )
                                 val fallback = Intent(Intent.ACTION_VIEW).apply {
                                     setDataAndType(uri, "vnd.android.document/root")
                                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -76,12 +67,12 @@ class MainActivity : FlutterActivity() {
                         }
                     }
 
-                    // ── yt-dlp: analyze ────────────────────────────
+                    // ── yt-dlp: analyze ───────────────────────────────────────
                     "analyze" -> {
                         val url = call.argument<String>("url") ?: ""
                         activityScope.launch {
                             try {
-                                val res = module.callAttr("analyze", url).toString()
+                                val res = ytdlpModule.callAttr("analyze", url).toString()
                                 withContext(Dispatchers.Main) { result.success(res) }
                             } catch (e: Exception) {
                                 withContext(Dispatchers.Main) {
@@ -91,34 +82,88 @@ class MainActivity : FlutterActivity() {
                         }
                     }
 
-                    // ── yt-dlp: download ───────────────────────────
-                    "download" -> {
-                        val url      = call.argument<String>("url")      ?: ""
-                        val formatId = call.argument<String>("formatId") ?: "best"
-                        // Bug fix: key name aligned with Dart side ("outputDir")
-                        val outDir   = call.argument<String>("outputDir")
-                            ?: Environment.getExternalStoragePublicDirectory(
-                                Environment.DIRECTORY_DOWNLOADS
-                            ).absolutePath
+                    // ── yt-dlp: foreground download queue ─────────────────────
+                    "enqueueDownload" -> {
+                        val arguments = call.arguments as? Map<String, Any?> ?: emptyMap()
+                        val taskId = arguments["taskId"] as? String ?: ""
+                        if (taskId.isEmpty()) {
+                            result.error("DOWNLOAD_ERROR", "Missing taskId", null)
+                            return@setMethodCallHandler
+                        }
+                        DownloadForegroundService.enqueue(applicationContext, arguments)
+                        result.success("{\"accepted\":true}")
+                    }
 
+                    "getDownloadTask" -> {
+                        val taskId = call.argument<String>("taskId") ?: ""
+                        result.success(
+                            DownloadForegroundService.readTask(applicationContext, taskId)
+                        )
+                    }
+
+                    "getDownloadTasks" -> {
+                        result.success(DownloadForegroundService.readTasks(applicationContext))
+                    }
+
+                    "removeFinishedDownload" -> {
+                        val taskId = call.argument<String>("taskId") ?: ""
+                        DownloadForegroundService.removeFinished(applicationContext, taskId)
+                        result.success(null)
+                    }
+
+                    "clearFinishedDownloads" -> {
+                        DownloadForegroundService.clearFinished(applicationContext)
+                        result.success(null)
+                    }
+
+                    // ── yt-dlp: cooperative cancellation ──────────────────────
+                    "cancelDownload" -> {
+                        val taskId = call.argument<String>("taskId") ?: ""
+                        val before = DownloadForegroundService.readTask(
+                            applicationContext,
+                            taskId
+                        )
+                        val cancellable = before != null && listOf(
+                            "queued",
+                            "preparing",
+                            "downloading",
+                            "waitingToRetry",
+                        ).any { before.contains("\"status\":\"$it\"") }
+                        if (taskId.isEmpty() || !cancellable) {
+                            result.success("{\"accepted\":false,\"stopped\":false}")
+                            return@setMethodCallHandler
+                        }
+
+                        DownloadForegroundService.cancel(applicationContext, taskId)
                         activityScope.launch {
-                            try {
-                                val res = module.callAttr("download", url, formatId, outDir)
-                                    .toString()
-                                withContext(Dispatchers.Main) { result.success(res) }
-                            } catch (e: Exception) {
-                                withContext(Dispatchers.Main) {
-                                    result.error("DOWNLOAD_ERROR", e.message, null)
+                            val stopped = withTimeoutOrNull(15_000) {
+                                while (true) {
+                                    val snapshot = DownloadForegroundService.readTask(
+                                        applicationContext,
+                                        taskId
+                                    )
+                                    if (snapshot?.contains("\"status\":\"cancelled\"") == true) {
+                                        return@withTimeoutOrNull true
+                                    }
+                                    delay(100)
                                 }
+                            } == true
+                            withContext(Dispatchers.Main) {
+                                result.success("{\"accepted\":true,\"stopped\":$stopped}")
                             }
                         }
                     }
 
-                    // ── yt-dlp: poll progress ──────────────────────
+                    // ── yt-dlp: poll progress ─────────────────────────────────
                     "getProgress" -> {
+                        val taskId = call.argument<String>("taskId") ?: ""
+                        if (taskId.isEmpty()) {
+                            result.error("PROGRESS_ERROR", "Missing taskId", null)
+                            return@setMethodCallHandler
+                        }
                         activityScope.launch {
                             try {
-                                val res = module.callAttr("get_progress").toString()
+                                val res = ytdlpModule.callAttr("get_progress", taskId).toString()
                                 withContext(Dispatchers.Main) { result.success(res) }
                             } catch (e: Exception) {
                                 withContext(Dispatchers.Main) {
@@ -132,7 +177,7 @@ class MainActivity : FlutterActivity() {
                         val url = call.argument<String>("url") ?: ""
                         activityScope.launch {
                             try {
-                                val res = module.callAttr("get_playlist_entries", url).toString()
+                                val res = ytdlpModule.callAttr("get_playlist_entries", url).toString()
                                 withContext(Dispatchers.Main) { result.success(res) }
                             } catch (e: Exception) {
                                 withContext(Dispatchers.Main) {
@@ -142,13 +187,13 @@ class MainActivity : FlutterActivity() {
                         }
                     }
 
-                    // ── Audio extraction (Phương án 2: native MediaExtractor) ──
+                    // ── Audio extraction: native MediaExtractor + MediaMuxer ──
                     "extractAudio" -> {
                         val inputPath  = call.argument<String>("inputPath")  ?: ""
                         val outputPath = call.argument<String>("outputPath") ?: ""
                         activityScope.launch {
                             try {
-                                val success = extractAudioNative(inputPath, outputPath)
+                                val success = AudioExtractor.extractToM4a(inputPath, outputPath)
                                 withContext(Dispatchers.Main) { result.success(success) }
                             } catch (e: Exception) {
                                 withContext(Dispatchers.Main) {
@@ -161,69 +206,7 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+
     }
 
-    // ── Native audio extraction via MediaExtractor + MediaMuxer ──────────────
-    // Copies audio track from src MP4/webm into a new M4A container.
-    // No re-encoding → very fast, lossless quality.
-    // Supports any audio codec that can be muxed into MPEG-4 (AAC, Opus, MP3…).
-    private fun extractAudioNative(srcPath: String, dstPath: String): Boolean {
-        if (srcPath.isEmpty() || dstPath.isEmpty()) return false
-
-        val extractor = MediaExtractor()
-        var muxer: MediaMuxer? = null
-
-        try {
-            extractor.setDataSource(srcPath)
-
-            // Find first audio track
-            var audioTrackIndex = -1
-            for (i in 0 until extractor.trackCount) {
-                val format = extractor.getTrackFormat(i)
-                val mime = format.getString(MediaFormat.KEY_MIME) ?: continue
-                if (mime.startsWith("audio/")) {
-                    audioTrackIndex = i
-                    break
-                }
-            }
-
-            if (audioTrackIndex < 0) return false
-
-            extractor.selectTrack(audioTrackIndex)
-            val audioFormat = extractor.getTrackFormat(audioTrackIndex)
-
-            // Delete existing output file if any
-            File(dstPath).takeIf { it.exists() }?.delete()
-
-            muxer = MediaMuxer(dstPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-            val dstTrackIndex = muxer.addTrack(audioFormat)
-            muxer.start()
-
-            val buffer    = ByteBuffer.allocate(1 * 1024 * 1024) // 1MB buffer
-            val bufferInfo = MediaCodec.BufferInfo()
-
-            while (true) {
-                bufferInfo.offset = 0
-                bufferInfo.size   = extractor.readSampleData(buffer, 0)
-                if (bufferInfo.size < 0) break
-
-                bufferInfo.presentationTimeUs = extractor.sampleTime
-                bufferInfo.flags              = extractor.sampleFlags
-
-                muxer.writeSampleData(dstTrackIndex, buffer, bufferInfo)
-                extractor.advance()
-            }
-
-            muxer.stop()
-            return true
-
-        } catch (e: Exception) {
-            // Clean up failed output file
-            File(dstPath).takeIf { it.exists() }?.delete()
-            throw e
-        } finally {
-            try { muxer?.release() } catch (_: Exception) {}
-            extractor.release()
-        }
-    }
 }

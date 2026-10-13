@@ -35,7 +35,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.29.2'
+          flutter-version: '3.44.5'
           cache: true
 
       - name: Cache Gradle
@@ -46,6 +46,9 @@ jobs:
 
       - name: Analyze project
         run: flutter analyze --no-fatal-infos
+
+      - name: Test downloader
+        run: flutter test
 
       - name: Get app version
         id: version
